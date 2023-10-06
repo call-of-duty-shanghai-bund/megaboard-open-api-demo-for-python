@@ -5,5 +5,5 @@ secret = "XjgBAUb4lo1t6xey7d5NdDgwaBM2iOXngQnWzgQQ"
 
 if __name__ == '__main__':
     client = MegaboardClient(access_key, secret)
-    res = client.get("/api/v1/time")
+    res = client.get_server_time()
     print(res)
