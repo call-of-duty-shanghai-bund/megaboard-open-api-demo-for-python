@@ -179,4 +179,4 @@ class MegaboardClient:
         }
         if passphrase:
             params.update({"passphrase": passphrase})
-        return self.post("/stateless/order/market/ubase/trailing-stop", params)
+        return self.post("/api/v1/stateless/order/market/ubase/trailing-stop", params)
