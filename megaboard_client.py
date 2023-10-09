@@ -94,6 +94,10 @@ class MegaboardClient:
         }
         return self.post("/api/v1/keypair/remove", params)
 
+    def get_keypairs_info(self, username: str):
+        params = {"username": username}
+        return self.get("/api/v1/keypairs", params)
+
     def get_ip_whitelist(self, username: str):
         params = {"username": username}
         return self.get("/api/v1/ip/whitelist", params)
