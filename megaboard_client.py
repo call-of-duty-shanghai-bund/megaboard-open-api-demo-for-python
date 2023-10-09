@@ -137,3 +137,46 @@ class MegaboardClient:
             "pullback": pullback_rate
         }
         return self.post("/api/v1/order/market/ubase/trailing-stop", params)
+
+    def place_ubase_market_order_stateless(self, username: str, apikey: str, apisecret: str,
+                                           exchange: Literal["binance", "okx", "bybit"],
+                                           market: Literal["spot", "perpetual"], coin: str,
+                                           side: Literal["LONG", "SHORT"], amount: float, tp_rate: float = None,
+                                           sl_rate: float = None, passphrase: str = None):
+        params = {
+            "username": username,
+            "apikey": apikey,
+            "apisecret": apisecret,
+            "exchange": exchange,
+            "market": market,
+            "coin": coin,
+            "side": side,
+            "amount": amount
+        }
+        if tp_rate:
+            params.update({"tp_rate": tp_rate})
+        if sl_rate:
+            params.update({"sl_rate": sl_rate})
+        if passphrase:
+            params.update({"passphrase": passphrase})
+        return self.post("/api/v1/stateless/order/market/ubase", params)
+
+    def place_ubase_market_order_with_trailing_stop_stateless(self, username: str, apikey: str, apisecret: str,
+                                                              exchange: Literal["binance", "okx", "bybit"],
+                                                              market: Literal["spot", "perpetual"], coin: str,
+                                                              side: Literal["LONG", "SHORT"], amount: float,
+                                                              pullback_rate: float, passphrase: str = None):
+        params = {
+            "username": username,
+            "apikey": apikey,
+            "apisecret": apisecret,
+            "exchange": exchange,
+            "market": market,
+            "coin": coin,
+            "side": side,
+            "amount": amount,
+            "pullback": pullback_rate
+        }
+        if passphrase:
+            params.update({"passphrase": passphrase})
+        return self.post("/stateless/order/market/ubase/trailing-stop", params)
