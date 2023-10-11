@@ -73,6 +73,18 @@ class MegaboardClient:
     def get_server_time(self):
         return self.get("/api/v1/time")
 
+    def register_user(self, username: str):
+        params = {
+            "username": username
+        }
+        return self.post("/api/v1/user/register", params)
+
+    def remove_user(self, username: str):
+        params = {
+            "username": username
+        }
+        return self.post("/api/v1/user/remove", params)
+
     def add_keypair(self, username: str, exchange: str, account_name: str, apikey: str, secret: str,
                     passphrase: str = None):
         params = {
