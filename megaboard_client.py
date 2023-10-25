@@ -1,18 +1,24 @@
+import asyncio
 import datetime
 import copy
+import json
 from typing import Literal
 
 import requests
 import hashlib
 import uuid
 
+import websockets
+
 
 class MegaboardClient:
 
-    def __init__(self, access_key: str, secret: str, host: str = "https://api.megaboard.biz"):
+    def __init__(self, access_key: str, secret: str, http_host: str = "https://api.megaboard.biz",
+                 websocket_host="wss://api.megaboard.biz"):
         self.access_key = access_key
         self.secret = secret
-        self.host = host
+        self.http_host = http_host
+        self.websocket_host = websocket_host
 
     @staticmethod
     def _generate_signature(params: dict[str, str], access_key: str, secret: str, timestamp: str,
@@ -54,11 +60,70 @@ class MegaboardClient:
         }
         return headers
 
+    async def _ping_pong_task(self, websocket, sid):
+        while True:
+            ping_message = {
+                "timestamp": int(datetime.datetime.now().timestamp() * 1000),
+                "type": "ping",
+                "sid": sid,
+                "mid": str(uuid.uuid4()),
+                "data": "ping",
+                "version": "2.0"
+            }
+            await websocket.send(json.dumps(ping_message))
+            print(f"Send Ping Frame:{ping_message}")
+            await asyncio.sleep(5)  # Send a ping every 5 seconds
+
+    async def _listen_task(self, websocket):
+        try:
+            while True:
+                response = json.loads(await websocket.recv())
+                if response.get("type") == "pong":
+                    print(f"Received Pong Frame:{response}")
+                else:
+                    print(f"Received Data Message: {response}")
+        except websockets.ConnectionClosed:
+            print("Connection closed")
+
+    async def create_connection(self, path: str, params=None):
+        if params is None:
+            params = {}
+
+        url = self.websocket_host + path
+        headers = self._generate_headers_for_auth(params)
+
+        # 构造warmup message，完成鉴权&参数传递
+        warmup_message = {
+            "timestamp": int(datetime.datetime.now().timestamp() * 1000),
+            "type": "warmup",
+            "headers": headers,
+            "data": params,
+            "mid": str(uuid.uuid4()),
+            "version": "2.0"
+        }
+
+        async with websockets.connect(url) as websocket:
+
+            await websocket.send(json.dumps(warmup_message))
+            print(f"Send Warmup Message:{warmup_message}")
+
+            ack_response = json.loads(await websocket.recv())
+            if ack_response.get("type") == "warmup" and ack_response.get("data") == "warmup success":
+                print(f"ACK Warmup Message:{ack_response}")
+                sid = ack_response["sid"]
+
+                ping_pong_task = asyncio.create_task(self._ping_pong_task(websocket, sid))
+                listen_task = asyncio.create_task(self._listen_task(websocket))
+
+                await asyncio.gather(ping_pong_task, listen_task)
+            else:
+                print(f"Warmup failed:{ack_response}")
+
     def get(self, path: str, params=None):
         if params is None:
             params = {}
 
-        url = self.host + path
+        url = self.http_host + path
         headers = self._generate_headers_for_auth(params)
         return requests.get(url, params=params, headers=headers).json()
 
@@ -66,7 +131,7 @@ class MegaboardClient:
         if params is None:
             params = {}
 
-        url = self.host + path
+        url = self.http_host + path
         headers = self._generate_headers_for_auth(params)
         return requests.post(url, data=params, headers=headers).json()
 
@@ -192,3 +257,30 @@ class MegaboardClient:
         if passphrase:
             params.update({"passphrase": passphrase})
         return self.post("/api/v1/stateless/order/market/ubase/trailing-stop", params)
+
+    # please run with asyncio.run
+    async def subscribe_positions_stateless(self, username: str, apikey: str, apisecret: str, exchange: str,
+                                            market: str, passphrase: str = None):
+        params = {
+            "username": username,
+            "apikey": apikey,
+            "apisecret": apisecret,
+            "exchange": exchange,
+            "market": market,
+        }
+        if passphrase:
+            params.update({"passphrase": passphrase})
+        await self.create_connection("/api/v1/ws/stateless/positions", params)
+
+    async def subscribe_balance_stateless(self, username: str, apikey: str, apisecret: str, exchange: str,
+                                          market: str, passphrase: str = None):
+        params = {
+            "username": username,
+            "apikey": apikey,
+            "apisecret": apisecret,
+            "exchange": exchange,
+            "market": market,
+        }
+        if passphrase:
+            params.update({"passphrase": passphrase})
+        await self.create_connection("/api/v1/ws/stateless/balance", params)
